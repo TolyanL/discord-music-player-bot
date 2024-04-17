@@ -7,6 +7,8 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
+nextcord = "^2.6.0"
+youtube-dl = "^2021.12.17"
 
 
 [build-system]
