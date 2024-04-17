@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "ds-player-bot"
+version = "0.1.0"
+description = "Public Discord bot for playing music"
+authors = ["People"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
