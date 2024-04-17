@@ -1,10 +1,9 @@
-# TEMP
-discord_music_bot/
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+ffmpeg
 
 # C extensions
 *.so
