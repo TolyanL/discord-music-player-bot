@@ -1,36 +1,36 @@
 class Queue:
     def __init__(self):
-        self.__value = []
-        self.__pt = 0
+        self.songs = []
+        self.pt = 0
 
-    def add(self, element):
-        self.__value.append(element)
+    def add(self, element: list):
+        self.songs.append(element)
 
-    def q_remove(self):
+    def remove(self):
         if not self.is_empty():
-            tmp = self.__value[self.__pt]
-            self.__pt += 1
-            if self.__pt > len(self.__value) / 2:
-                self.__value = self.__value[self.__pt :]
-                self.__pt = 0
-            return tmp
+            song = self.songs[self.pt]
+            self.pt += 1
+            if self.pt > len(self.songs) / 2:
+                self.songs = self.songs[self.pt :]
+                self.pt = 0
+            return song
         else:
             return -1
 
-    def q_rem_by_index(self, arg):
-        return self.__value.pop(self.__pt + arg)
+    def remove_by_index(self, index):
+        return self.songs.pop(self.pt + index)
 
-    def get_value(self):
-        return self.__value[self.__pt :]
+    def get_songs(self):
+        return self.songs[self.pt :]
 
     def is_empty(self):
-        return not self.__value
+        return not self.songs
 
     def __str__(self):
-        return str(self.__value[self.__pt :])
+        return str(self.songs[self.pt :])
 
     def __getitem__(self, item):
-        return self.__value[item]
+        return self.songs[item]
 
     def __len__(self):
-        return len(self.__value)
+        return len(self.songs)
