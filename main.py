@@ -4,14 +4,12 @@ import nextcord
 import datetime
 import lazy_queue
 
-
 # from nextcord import Interaction
-from nextcord import Interaction
 from nextcord.ext import commands
 from nextcord.ext.commands import context
 
 
-DEBUG = True
+DEBUG = True if os.getenv("DEBUG") == "True" else False
 
 intents = nextcord.Intents.default()
 intents.members = True
@@ -45,6 +43,10 @@ guild_ids = [
 @bot.event
 async def on_ready():
     await bot.wait_until_ready()
+
+    if DEBUG:
+        print("Debug mode ON")
+
     print(f"{bot.user.name} has connected to Discord.")
 
 
@@ -79,7 +81,7 @@ async def add(interaction: context.Context, url: str):
 
     song_url = info["url"]
 
-    name = info["title"]
+    name = str(info["title"]).replace("[", "").replace("]", "")
     thumbnail = info.get("thumbnail")
     time = str(datetime.timedelta(seconds=info.get("duration"))) if info.get("duration") else "Прямой эфир"
 
@@ -91,12 +93,17 @@ async def add(interaction: context.Context, url: str):
     embed.add_field(name="Длительность", value=time)
     embed.set_thumbnail(thumbnail)
 
-    await interaction.message.reply(embed=embed)
+    try:
+        await interaction.message.reply(embed=embed)
+    except:
+        await interaction.send(embed=embed)
 
 
 def step_and_remove(voice_client):
     if loop_flag:
-        songs_queue.add(songs_queue.get_songs()[0])
+        current_queue = songs_queue.get_songs()
+        if len(current_queue):
+            songs_queue.add(current_queue[0])
     songs_queue.remove()
     audio_player_task(voice_client)
 
@@ -116,7 +123,7 @@ def audio_player_task(voice_client):
 # ===== Play command staf End =====
 
 
-@bot.command(name="play", aliases=["p", "s", "pl", "go"], guild_ids=guild_ids if DEBUG else None)
+@bot.command(name="play", aliases=["p", "pl", "go"], guild_ids=guild_ids if DEBUG else None)
 async def play(interaction: context.Context, *url):
     await connect_to_vc(interaction)
 
@@ -127,21 +134,21 @@ async def play(interaction: context.Context, *url):
     await add(interaction, " ".join(url))
     try:
         await interaction.message.add_reaction(emoji="🎸")
-    except:
+    except Exception as err:
         pass
 
     voice_client = interaction.guild.voice_client
     audio_player_task(voice_client)
 
 
-@bot.command()
+@bot.command(name="loop", aliases=["l", "lo", "rp"], guild_ids=guild_ids if DEBUG else None)
 async def loop(interaction: context.Context):
     global loop_flag
     loop_flag = True
     await interaction.message.reply("Залуплено")
 
 
-@bot.command()
+@bot.command(name="unloop", aliases=["unl", "ul", "ll"], guild_ids=guild_ids if DEBUG else None)
 async def unloop(interaction: context.Context):
     global loop_flag
     loop_flag = False
@@ -150,14 +157,16 @@ async def unloop(interaction: context.Context):
 
 @bot.command(name="queue", aliases=["q", "qq", "ss", "songs"], guild_ids=guild_ids if DEBUG else None)
 async def queue(interaction: context.Context):
-    if len(songs_queue.get_songs()) > 0:
+    if len(songs_queue.get_songs()) > 0 and len(songs_queue.get_songs()) != 1:
         songs = list()
 
-        for song in songs_queue.get_songs():
+        for index, song in enumerate(songs_queue.get_songs(), 1):
             name = song[0]
             if len(song[0]) > 30:
                 name = song[0][:30] + "..."
-            songs.append(f"📀 `{name:<33}   {song[1]:>20}`\n")
+            songs.append(f"📀 `{index}. {name:<33}   {song[1]:>20}`\n")
+
+        songs[0] = songs[0].replace("📀", "🎶")  # current song
 
         embed = nextcord.Embed(
             title=f"Очередь [LOOP: {loop_flag}]",
@@ -188,7 +197,7 @@ async def resume(interaction: context.Context):
             await interaction.message.reply(f"Сняли трек [{song[0]}]({song[2]}) с паузы")
 
 
-@bot.command(name="skip", aliases=["sk", "next", "nx", "nxt"], guild_ids=guild_ids if DEBUG else None)
+@bot.command(name="skip", aliases=["s", "sk", "next", "nx", "nxt"], guild_ids=guild_ids if DEBUG else None)
 async def skip(interaction: context.Context):
     voice = nextcord.utils.get(bot.voice_clients, guild=interaction.guild)
     if voice:
@@ -202,13 +211,34 @@ async def skip(interaction: context.Context):
             track_next = song_next[0][:33] + "..." if len(song_next[0]) > 33 else song_next[0]
 
             embed = nextcord.Embed(
-                description=f"Скипаем трек [{track_now}]({song_now[3]}) - {song_now[1]}\n\
-                    Следующий трек - [{track_next}]({song_next[3]}) - {song_next[1]}",
+                description=f"Скипаем трек [{track_now}]({song_now[3]}) - {song_now[1]}\nСледующий трек - [{track_next}]({song_next[3]}) - {song_next[1]}",
                 colour=nextcord.Colour.red(),
             )
             await interaction.message.reply(embed=embed)
         else:
             voice.stop()
+
+
+@bot.command(name="clear", aliases=["cl", "cc", "flush", "fl"], guild_ids=guild_ids if DEBUG else None)
+async def clear(interaction: context.Context):
+    voice = nextcord.utils.get(bot.voice_clients, guild=interaction.guild)
+    if voice:
+        voice.stop()
+        while not songs_queue.is_empty():
+            songs_queue.remove()
+
+
+@bot.command(name="remove", aliases=["rem", "del", "ds", "dd", "rr"], guild_ids=guild_ids if DEBUG else None)
+async def remove(interaction: context.Context, index: int):
+    try:
+        if len(songs_queue.get_songs()):
+            if index - 1 >= 0:
+                removed_song = songs_queue.remove_by_index(index - 1)
+                await interaction.message.reply(f"Вычеркнул из списка: ({removed_song[0]})[{removed_song[3]}]")
+        else:
+            await interaction.message.reply("Нечего удалять")
+    except:
+        await interaction.message.reply(f"Песни с такой позицией не существует")
 
 
 if __name__ == "__main__":
