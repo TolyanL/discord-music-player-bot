@@ -72,24 +72,32 @@ async def disconect_to_vc(interaction: context.Context):
 # ===== Play command staf =====
 
 
-async def add(interaction: context.Context, url: str):
-    with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
-        try:
-            info = ydl.extract_info(url, download=False)
-        except:
-            info = ydl.extract_info(f"ytsearch:{url}", download=False)["entries"][0]
+async def add(interaction: context.Context, url: str = "", file: nextcord.message.Attachment = None):
+    if not file:
+        with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+            try:
+                info = ydl.extract_info(url, download=False)
+            except:
+                info = ydl.extract_info(f"ytsearch:{url}", download=False)["entries"][0]
 
-    song_url = info["url"]
+        song_file_url = info["url"]
 
-    name = str(info["title"]).replace("[", "").replace("]", "")
-    thumbnail = info.get("thumbnail")
-    time = str(datetime.timedelta(seconds=info.get("duration"))) if info.get("duration") else "Прямой эфир"
+        name = str(info["title"]).replace("[", "").replace("]", "")
+        thumbnail = info.get("thumbnail")
+        time = str(datetime.timedelta(seconds=info.get("duration"))) if info.get("duration") else "Прямой эфир"
 
-    embed_url = info.get("original_url")  # "https://youtu.be/" + str(info["id"])
+        embed_url = info.get("original_url")  # "https://youtu.be/" + str(info["id"])
+    else:
+        name = file.filename.replace("_", " ")
+        thumbnail = None
+        time = "0:00"
+        song_file_url = file.url
+        embed_url = file.url
 
-    songs_queue.add([name, time, song_url, embed_url])
+    songs_queue.add([name, time, song_file_url, embed_url])
 
     embed = nextcord.Embed(description=f"Записываю [{name}]({embed_url}) в очередь 📝", colour=nextcord.Colour.red())
+
     embed.add_field(name="Длительность", value=time)
     embed.set_thumbnail(thumbnail)
 
@@ -112,7 +120,6 @@ def audio_player_task(voice_client):
     if not voice_client.is_playing() and songs_queue.get_songs():
         voice_client.play(
             nextcord.FFmpegPCMAudio(
-                executable="ffmpeg",
                 source=songs_queue.get_songs()[0][2],
                 **FFMPEG_OPTIONS,
             ),
@@ -127,14 +134,21 @@ def audio_player_task(voice_client):
 async def play(interaction: context.Context, *url):
     await connect_to_vc(interaction)
 
-    if not url or url == "":
-        embed = nextcord.Embed(description="Введите название песни или ссылку на нее", colour=nextcord.Colour.red())
+    if not interaction.message.attachments and url == "":
+        embed = nextcord.Embed(
+            description="Введите название песни или ссылку на нее, или скиньте файл с песней",
+            colour=nextcord.Colour.red(),
+        )
         return await interaction.message.reply(embed=embed)
 
-    await add(interaction, " ".join(url))
+    if url:
+        await add(interaction, " ".join(url))
+    else:
+        await add(interaction, file=interaction.message.attachments[0])
+
     try:
         await interaction.message.add_reaction(emoji="🎸")
-    except Exception as err:
+    except:
         pass
 
     voice_client = interaction.guild.voice_client
@@ -157,7 +171,7 @@ async def unloop(interaction: context.Context):
 
 @bot.command(name="queue", aliases=["q", "qq", "ss", "songs"], guild_ids=guild_ids if DEBUG else None)
 async def queue(interaction: context.Context):
-    if len(songs_queue.get_songs()) > 0 and len(songs_queue.get_songs()) != 1:
+    if len(songs_queue.get_songs()) and len(songs_queue.get_songs()) != 1:
         songs = list()
 
         for index, song in enumerate(songs_queue.get_songs(), 1):
@@ -226,6 +240,7 @@ async def clear(interaction: context.Context):
         voice.stop()
         while not songs_queue.is_empty():
             songs_queue.remove()
+        await interaction.send("Очистил очередь")
 
 
 @bot.command(name="remove", aliases=["rem", "del", "ds", "dd", "rr"], guild_ids=guild_ids if DEBUG else None)
