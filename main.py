@@ -1,10 +1,10 @@
 import os
 import yt_dlp
 import nextcord
-import datetime
 
 from server_handler import ServerList
 from song_queue import Song
+from datetime import timedelta
 
 from nextcord.ext import commands
 from nextcord.ext.commands import context
@@ -65,23 +65,60 @@ async def connect_to_vc(interaction: context.Context):
 @bot.command(name="disconnect", aliases=["discon", "d", "off", "kill"], guild_ids=guild_ids if DEBUG else None)
 async def disconect_to_vc(interaction: context.Context):
     if interaction.voice_client:
-        await clear(interaction)
+        server_queues.get_guild(interaction.guild.id).clear_queue()
         await interaction.guild.voice_client.disconnect()
     else:
         await interaction.reply("Ты не в голосовом канале")
 
 
+def process_playlist(song_entries) -> list[list[Song] | str]:
+    queue_songs = list()
+    playlist_duration = 0
+    for entry in song_entries:
+        duration = entry["duration"]
+        playlist_duration += duration
+        queue_songs.append(
+            Song(
+                name=entry["fulltitle"],
+                duration=duration,
+                url=entry["url"],
+                embed_url=entry["original_url"],
+                thumbnail=entry["thumbnail"],
+            )
+        )
+    return [queue_songs, str(timedelta(seconds=playlist_duration))]
+
+
 def add(guild_id: int, url: str = None, file: list[nextcord.message.Attachment] = None):
+    guild_queue = server_queues.get_guild(guild_id)
+
     if not file:
         with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
             try:
                 info = ydl.extract_info(url, download=False)
             except:
                 info = ydl.extract_info(f"ytsearch:{url}", download=False)["entries"][0]
+
+        playlist = info.get("entries")
+
+        if playlist:
+            queue_songs = process_playlist(playlist)
+            for song in queue_songs[0]:
+                guild_queue.add(song)
+
+            embed = nextcord.Embed(
+                description=f"Записываю плейлист [{info.get('title')}]({info.get('original_url')}) ({len(queue_songs[0])} песни) в очередь 📝",
+                colour=nextcord.Colour.red(),
+            )
+            embed.add_field(name="Длительность", value=queue_songs[1])
+            embed.set_thumbnail(queue_songs[0][0].thumbnail)
+
+            return embed
+
         song = Song(
             name=str(info["title"]).replace("[", "").replace("]", ""),
-            duration=str(datetime.timedelta(seconds=info.get("duration"))) if info.get("duration") else "Прямой эфир",
-            song_url=info["url"],
+            duration=info.get("duration") if info.get("duration") else 0,
+            url=info["url"],
             embed_url=info.get("original_url"),  # "https://youtu.be/" + str(info["id"])
             thumbnail=info.get("thumbnail"),
         )
@@ -93,11 +130,10 @@ def add(guild_id: int, url: str = None, file: list[nextcord.message.Attachment] 
         song = Song(
             name=info["title"].replace("_", " "),
             duration="0:00",
-            song_url=file.url,
+            url=file.url,
             embed_url=file.url,
         )
 
-    guild_queue = server_queues.get_guild(guild_id)
     guild_queue.add(song)
 
     embed = nextcord.Embed(
@@ -176,14 +212,14 @@ async def message_play(interaction: nextcord.Interaction, message: nextcord.Mess
         else:
             await interaction.guild.voice_client.move_to(interaction.user.voice.channel)
     else:
-        return await interaction.reply("You are not in voice channel")
+        return await interaction.send("You are not in voice channel")
 
     if not message.attachments and not message.content:
         embed = nextcord.Embed(
             description="Не могу найти эту песню 🤔",
             colour=nextcord.Colour.red(),
         )
-        return await interaction.message.reply(embed=embed)
+        return await interaction.send(embed=embed)
 
     url = message.content
     files = message.attachments
@@ -193,10 +229,10 @@ async def message_play(interaction: nextcord.Interaction, message: nextcord.Mess
     else:
         embed = add(interaction.guild.id, file=files[0])
 
-    if interaction.message:
+    try:
         await interaction.message.add_reaction(emoji="🎸")
         await interaction.message.reply(embed=embed)
-    else:
+    except:
         await interaction.send(embed=embed)
 
     voice_client = interaction.guild.voice_client
@@ -237,6 +273,8 @@ async def queue(interaction: context.Context):
             description="".join(songs),
             colour=nextcord.Colour.red(),
         )
+        embed.set_footer(text=f"{len(songs_queue.all_songs())} 📀 - {songs_queue.get_str_duration()}")
+
         await interaction.send(embed=embed)
     else:
         await interaction.send("Очередь пуста 📄")
@@ -284,6 +322,7 @@ async def skip(interaction: context.Context):
                 description=f"Скипаем трек [{track_now}]({song_now.url}) - {song_now.duration}\nСледующий трек - [{track_next}]({song_next.url}) - {song_next.duration}",
                 colour=nextcord.Colour.red(),
             )
+
             await interaction.message.reply(embed=embed)
         else:
             voice.stop()
