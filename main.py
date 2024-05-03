@@ -273,7 +273,7 @@ async def queue(interaction: context.Context):
             description="".join(songs),
             colour=nextcord.Colour.red(),
         )
-        embed.set_footer(text=f"{len(songs_queue.all_songs())} 📀 - {songs_queue.get_str_duration()}")
+        embed.set_footer(text=f"{len(songs_queue.all_songs())} 📀 {songs_queue.get_str_duration()}")
 
         await interaction.send(embed=embed)
     else:
@@ -355,4 +355,4 @@ async def remove(interaction: context.Context, index: int):
 
 
 if __name__ == "__main__":
-    bot.run(os.getenv("DISCOR_BOT_TOKEN"))
+    bot.run(os.getenv("DISCORD_BOT_TOKEN"))
