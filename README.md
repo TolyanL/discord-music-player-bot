@@ -73,3 +73,8 @@ pip install -r requirements.txt
 | skip | skip current song on the server | "s", "sk", "next", "nx", "nxt" |
 | clear | clear server queue | "cl", "cc", "flush", "fl" |
 | remove | remove song from the server queue by index | "rem", "del", "ds", "dd", "rr" |
+
+### Additional Information
+if you want to run the application in the background (using &) you will need to in the file `_utils.py `libraries `yt_dlp` comment out the line `1439: out.flush()` which will cause an error when working in the background.
+
+Script is located on the path `path/to/your/virtualenv/lib/python3.10/site-packages/yt_dlp/utils/_utils.py`
