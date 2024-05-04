@@ -35,7 +35,7 @@ YDL_OPTIONS = {
 
 
 guild_ids = [
-    1090672935255158838,
+    # your test guild id
 ]
 
 server_queues = ServerList()
