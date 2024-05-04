@@ -14,8 +14,15 @@ Clone project:
 git clone https://github.com/TolyanL/discord-music-player-bot.git
 cd discord-music-player-bot/
 ```
-Install ffmpeg:
+### Install ffmpeg:
 * [ffmpeg](https://johnvansickle.com/ffmpeg/)
+
+### or
+
+```sh
+apt update && sudo apt upgrade
+sudo apt install ffmpeg
+```
 
 ## Installing requirments
 
