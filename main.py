@@ -129,7 +129,7 @@ def add(guild_id: int, url: str = None, file: list[nextcord.message.Attachment] 
 
         song = Song(
             name=info["title"].replace("_", " "),
-            duration="0:00",
+            duration=0,
             url=file.url,
             embed_url=file.url,
         )
